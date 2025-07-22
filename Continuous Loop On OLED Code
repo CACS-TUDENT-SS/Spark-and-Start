@@ -1,0 +1,50 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+#define OLED_RESET     -1  // Not used with I2C
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// ESP8266 I2C Pins
+#define SDA_PIN 4  // D2
+#define SCL_PIN 5  // D1
+
+String scrollText = "Hello, OLED! ";  // Add a space for cleaner loop
+int textWidth;
+int x;  // Horizontal text position
+
+void setup() {
+  Wire.begin(SDA_PIN, SCL_PIN);
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    while (true);  // Halt
+  }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  // Set initial scroll values
+  textWidth = scrollText.length() * 6;  // Approx 6px per char
+  x = -textWidth;  // Start off-screen to the left
+}
+
+void loop() {
+  display.clearDisplay();
+  display.setCursor(x, 30);  // Vertical position
+  display.print(scrollText);
+  display.display();
+
+  x++;
+
+  if (x > SCREEN_WIDTH) {
+    x = -textWidth;  // Reset once it fully passes
+  }
+
+  delay(20);  // Adjust speed here
+}
+
