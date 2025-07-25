@@ -1,0 +1,92 @@
+// Pin definitions
+const int button1Pin = 4;
+const int button2Pin = 5;
+
+const int led1Pin = 12;
+const int led2Pin = 13;
+const int middleLedPin = 14;
+
+void setup() {
+  Serial.begin(9600);
+
+  pinMode(button1Pin, INPUT_PULLUP);
+  pinMode(button2Pin, INPUT_PULLUP);
+
+  pinMode(led1Pin, OUTPUT);
+  pinMode(led2Pin, OUTPUT);
+  pinMode(middleLedPin, OUTPUT);
+
+  digitalWrite(led1Pin, LOW);
+  digitalWrite(led2Pin, LOW);
+  digitalWrite(middleLedPin, LOW);
+}
+
+void loop() {
+  Serial.println("Press and hold both buttons to start...");
+  
+  // Wait for both players to press and hold
+  while (digitalRead(button1Pin) == HIGH || digitalRead(button2Pin) == HIGH) {
+    delay(10);
+  }
+
+  Serial.println("Ready...");
+
+// Wait a short time while players keep holding
+unsigned long holdStart = millis();
+while (millis() - holdStart < 1000) {
+  // If anyone lets go during this hold period, it's a false start
+  if (digitalRead(button1Pin) == HIGH) {
+    Serial.println("Player 1 released early! Player 2 wins.");
+    digitalWrite(led2Pin, HIGH);
+    delay(2000);
+    digitalWrite(led2Pin, LOW);
+    return;
+  }
+  if (digitalRead(button2Pin) == HIGH) {
+    Serial.println("Player 2 released early! Player 1 wins.");
+    digitalWrite(led1Pin, HIGH);
+    delay(2000);
+    digitalWrite(led1Pin, LOW);
+    return;
+  }
+  delay(10);
+}
+
+
+  if (digitalRead(button2Pin) == HIGH) {
+    Serial.println("Player 2 released early! Player 1 wins.");
+    digitalWrite(led1Pin, HIGH);
+    delay(2000);
+    digitalWrite(led1Pin, LOW);
+    return;
+  }
+
+  // Random delay
+  int delayTime = random(2000, 3000);
+  delay(delayTime);
+
+  // GO signal
+  digitalWrite(middleLedPin, HIGH);
+  Serial.println("GO!");
+
+  // Wait until someone releases
+  while (digitalRead(button1Pin) == LOW && digitalRead(button2Pin) == LOW) {
+    delay(1);
+  }
+
+  // Determine winner
+  if (digitalRead(button1Pin) == HIGH) {
+    Serial.println("Player 1 wins!");
+    digitalWrite(led1Pin, HIGH);
+  } else if (digitalRead(button2Pin) == HIGH) {
+    Serial.println("Player 2 wins!");
+    digitalWrite(led2Pin, HIGH);
+  }
+
+  delay(2000);
+
+  // Reset all LEDs
+  digitalWrite(led1Pin, LOW);
+  digitalWrite(led2Pin, LOW);
+  digitalWrite(middleLedPin, LOW);
+}
