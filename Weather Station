@@ -1,0 +1,125 @@
+#include <DHT.h>
+#include "MQ135.h"
+#include <ESP8266WiFi.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// === ThingSpeak Settings ===
+String apiKey = "Your Authentication API from Thingspeak";
+const char* ssid = "Wifi-Name";
+const char* pass = "Wifi-Password";
+const char* server = "api.thingspeak.com";
+WiFiClient client;
+
+// === Sensor Pins ===
+#define DHTPIN 14       // D5 = GPIO14
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+#define MQ135_PIN A0
+MQ135 gasSensor = MQ135(MQ135_PIN);
+
+// === OLED Setup ===
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// === Page System ===
+int currentPage = 0;         // 0: Temp, 1: Humidity, 2: Air
+unsigned long lastPageChange = 0;
+const unsigned long pageInterval = 5000; // change page every 5 seconds
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.clearDisplay();
+
+  // WiFi Connection
+  WiFi.begin(ssid, pass);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500); Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi connected!");
+}
+
+void loop() {
+  float temp = dht.readTemperature();
+  float hum = dht.readHumidity();
+  int air_quality = gasSensor.getPPM();
+
+  // Show OLED Page
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(0, 20);
+
+  switch (currentPage) {
+    case 0:
+      if (isnan(temp)) {
+        display.setTextSize(1);
+        display.setCursor(0, 20);
+        display.println("Temp Error");
+      } else {
+        display.print("Temp: ");
+        display.print(temp); display.println(" C");
+      }
+      break;
+    case 1:
+      if (isnan(hum)) {
+        display.setTextSize(1);
+        display.setCursor(0, 20);
+        display.println("Hum Error");
+      } else {
+        display.print("Hum: ");
+        display.print(hum); display.println(" %");
+      }
+      break;
+    case 2:
+      display.print("AQ: ");
+      display.print(air_quality); display.println(" PPM");
+      break;
+  }
+
+  display.display();
+
+  // Rotate Page
+  if (millis() - lastPageChange > pageInterval) {
+    currentPage = (currentPage + 1) % 3;
+    lastPageChange = millis();
+  }
+
+  // Send data to ThingSpeak once per full cycle (~15 sec)
+  if (currentPage == 2) {
+    sendToThingSpeak(temp, hum, air_quality);
+  }
+
+  delay(100);
+}
+
+void sendToThingSpeak(float temp, float hum, int air) {
+  if (isnan(temp) || isnan(hum)) return;
+
+  if (client.connect(server, 80)) {
+    String postStr = apiKey;
+    postStr += "&field1=" + String(temp);
+    postStr += "&field2=" + String(hum);
+    postStr += "&field3=" + String(air);
+    postStr += "\r\n\r\n";
+
+    client.print("POST /update HTTP/1.1\n");
+    client.print("Host: api.thingspeak.com\n");
+    client.print("Connection: close\n");
+    client.print("X-THINGSPEAKAPIKEY: " + apiKey + "\n");
+    client.print("Content-Type: application/x-www-form-urlencoded\n");
+    client.print("Content-Length: ");
+    client.print(postStr.length());
+    client.print("\n\n");
+    client.print(postStr);
+
+    Serial.println("✅ Data sent to ThingSpeak!");
+  }
+  client.stop();
+}
